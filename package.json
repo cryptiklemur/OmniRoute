@@ -181,7 +181,9 @@
     "check:model-lifecycle": "node --import tsx/esm scripts/check/check-model-lifecycle.mjs",
     "check:provider-consistency": "bun scripts/check/check-provider-consistency.ts",
     "check:provider-assets": "node scripts/check/check-provider-assets.mjs",
+    "check:provider-order-sync": "node scripts/check/check-provider-order-sync.mjs",
     "check:provider-asset-provenance": "node scripts/check/check-provider-asset-provenance.mjs",
+    "check:radar-sentinels": "node scripts/check/check-radar-sentinels.mjs",
     "check:nvidia-catalog-drift": "node --import tsx/esm scripts/check/check-nvidia-catalog-drift.ts",
     "check:fetch-targets": "node scripts/check/check-fetch-targets.mjs",
     "check:openapi-routes": "node scripts/check/check-openapi-routes.mjs",
@@ -264,6 +266,7 @@
     "coverage:report": "cross-env NODE_OPTIONS=--max-old-space-size=8192 c8 report --merge-async --output-dir coverage --exclude=tests/** --exclude=**/*.test.* --reporter=text --reporter=text-summary --reporter=html --reporter=json-summary --reporter=lcov",
     "coverage:summary": "node scripts/check/test-report-summary.mjs --input coverage/coverage-summary.json --output coverage/coverage-report.md",
     "check:pr-test-policy": "node scripts/check/check-pr-test-policy.mjs",
+    "check:pricing-freshness": "node scripts/check/check-pricing-freshness.mjs",
     "coverage:report:legacy": "c8 report --output-dir coverage --exclude=open-sse --reporter=text --reporter=text-summary",
     "test:all": "npm run test:unit && npm run test:vitest && npm run test:vitest:ui && npm run test:ecosystem && npm run test:e2e",
     "check": "npm run lint && npm run test",
@@ -483,7 +486,10 @@
     "fast-uri": "^3.1.7",
     "body-parser": "^2.3.0",
     "@yarnpkg/parsers": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
+    },
+    "@openai/codex-security": {
+      "smol-toml": "^1.8.0"
     },
     "jsdom": {
       "undici": "^7.29.0"
