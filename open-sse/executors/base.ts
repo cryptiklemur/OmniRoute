@@ -17,6 +17,8 @@ import { createCopilotIdentityFallback } from "./copilotIdentityFallback.ts";
 import {
   findOffendingField,
   detectUnsupportedParam,
+  isUnsupportedThinkingError,
+  REASONING_REQUEST_FIELDS,
   stripGroqUnsupportedFields,
 } from "../config/providerFieldStrips.ts";
 import {
@@ -1597,6 +1599,31 @@ export class BaseExecutor {
               `Upstream 400 rejected ${offending} on ${url} — retrying without it`
             );
             response = await fetchWithStartTimeout(url, { ...fetchOptions, body: retryBody });
+          } else if (isUnsupportedThinkingError(errText)) {
+            // Upstream rejected thinking by naming the model, not the field, so the
+            // two detectors above find nothing to strip. Drop whichever reasoning
+            // field the request actually carries and retry once. Ollama does this
+            // for Instruct-only models (e.g. Qwen3-Coder).
+            const reasoningFields = REASONING_REQUEST_FIELDS.filter(
+              (field) =>
+                !strippedFields.has(field) &&
+                (transformedBody as Record<string, unknown>)[field] !== undefined
+            );
+            if (reasoningFields.length > 0) {
+              for (const field of reasoningFields) {
+                strippedFields.add(field);
+                delete (transformedBody as Record<string, unknown>)[field];
+              }
+              let retryBody = JSON.stringify(transformedBody);
+              if (usesClaudeCodeProtocol || this.provider === "claude") {
+                retryBody = await signRequestBody(retryBody);
+              }
+              log?.info?.(
+                "THINKING_UNSUPPORTED",
+                `Upstream 400: ${model} has no thinking mode on ${url} — retrying without ${reasoningFields.join(", ")}`
+              );
+              response = await fetchWithStartTimeout(url, { ...fetchOptions, body: retryBody });
+            }
           } else {
             // Auto-learn: detect "Unsupported parameter" errors and persist to DB
             // when the provider config has autoLearn enabled (#6625).
