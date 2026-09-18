@@ -14,6 +14,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DefaultExecutor } from "../../open-sse/executors/default.ts";
+import { setGlobalAutoLearnEnabled } from "../../src/lib/db/paramFilters.ts";
 
 /** First call returns `status` with `errorText`; subsequent calls return 200 OK. */
 function mockFetchErrorThenOk(status: number, errorText: string) {
@@ -37,7 +38,10 @@ function mockFetchErrorThenOk(status: number, errorText: string) {
   return { bodies, callCount: () => calls, restore: () => void (globalThis.fetch = original) };
 }
 
-const baseCredentials = { apiKey: "relay-key", baseUrl: "https://relay.example/v1" };
+const baseCredentials = {
+  apiKey: "relay-key",
+  providerSpecificData: { baseUrl: "https://relay.example/v1" },
+};
 
 test("#13868: upstream 400 naming the model (not the field) as thinking-unsupported strips reasoning_effort and retries once", async () => {
   const { bodies, callCount, restore } = mockFetchErrorThenOk(
@@ -116,4 +120,44 @@ test("#13868: an UNRELATED 400 does NOT strip reasoning fields or retry", async 
   }
   assert.equal(callCount(), 1, "an unrelated 400 must not trigger the thinking-unsupported retry");
   assert.equal(bodies[0]?.reasoning_effort, "high", "the single attempt still carried the field");
+});
+
+test("#13868: a thinking-unsupported 400 with NO reasoning field on the body falls through to auto-learn instead of silently no-oping", async () => {
+  // Gemini-shaped case: the request carries no top-level REASONING_REQUEST_FIELDS entry
+  // (its thinking config is nested under generationConfig.thinkingConfig), so the
+  // isUnsupportedThinkingError branch has nothing to strip. Before this fix, that branch
+  // had no `else`, so an upstream 400 matching BOTH signals (thinking-unsupported wording
+  // AND a literal "Unsupported parameter" name) would still fall into the dead-end `if`
+  // and never reach the auto-learn detector below it, even though auto-learn is enabled.
+  setGlobalAutoLearnEnabled(true);
+  const { bodies, callCount, restore } = mockFetchErrorThenOk(
+    400,
+    "model does not support thinking; Unsupported parameter: generationConfig"
+  );
+  try {
+    await new DefaultExecutor("anthropic-compatible-cc-myrelay").execute({
+      model: "gemini-shaped-model",
+      body: {
+        model: "gemini-shaped-model",
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 1,
+        generationConfig: { thinkingConfig: { thinkingBudget: 100 } },
+      },
+      stream: false,
+      credentials: baseCredentials,
+    });
+  } finally {
+    restore();
+    setGlobalAutoLearnEnabled(false);
+  }
+  assert.equal(
+    callCount(),
+    2,
+    "must fall through to auto-learn and retry once the thinking branch finds nothing to strip"
+  );
+  assert.equal(
+    "generationConfig" in (bodies[1] ?? {}),
+    false,
+    "auto-learn must have stripped the field it detected"
+  );
 });

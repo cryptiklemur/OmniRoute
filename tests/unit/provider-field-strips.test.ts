@@ -85,10 +85,7 @@ test("stripGroqUnsupportedFields drops unsupported messages[].model and other me
 
 test("isUnsupportedThinkingError matches upstreams that name the model, not the field", () => {
   // Ollama's exact wording for an Instruct-only model.
-  assert.equal(
-    isUnsupportedThinkingError('"Qwen3-Coder:latest" does not support thinking'),
-    true
-  );
+  assert.equal(isUnsupportedThinkingError('"Qwen3-Coder:latest" does not support thinking'), true);
   assert.equal(isUnsupportedThinkingError("model gemma3 does not support reasoning"), true);
   assert.equal(isUnsupportedThinkingError("does  not\n support\tthinking"), true);
   assert.equal(isUnsupportedThinkingError("DOES NOT SUPPORT THINKING"), true);
