@@ -14,7 +14,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DefaultExecutor } from "../../open-sse/executors/default.ts";
-import { setGlobalAutoLearnEnabled } from "../../src/lib/db/paramFilters.ts";
+import {
+  deleteParamFilterConfig,
+  setGlobalAutoLearnEnabled,
+} from "../../src/lib/db/paramFilters.ts";
 
 /** First call returns `status` with `errorText`; subsequent calls return 200 OK. */
 function mockFetchErrorThenOk(status: number, errorText: string) {
@@ -149,6 +152,9 @@ test("#13868: a thinking-unsupported 400 with NO reasoning field on the body fal
   } finally {
     restore();
     setGlobalAutoLearnEnabled(false);
+    // Auto-learn persists "generationConfig" to this provider's blocklist; drop it so a
+    // re-run against the same DATA_DIR does not pre-strip the field and skip the retry.
+    deleteParamFilterConfig("anthropic-compatible-cc-myrelay");
   }
   assert.equal(
     callCount(),
